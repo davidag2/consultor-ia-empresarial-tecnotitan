@@ -8,6 +8,26 @@ const content = {
     nav: ["Diagnostico", "Modulos", "Reportes", "Pagos"],
     action: "Iniciar diagnostico",
     loginAction: "Acceder",
+    dashboardTitle: "Panel del cliente",
+    dashboardIntro:
+      "Seguimiento ejecutivo de modulos comprados, entrevistas pendientes, reportes generados y acciones recomendadas.",
+    purchasedModules: "Modulos comprados",
+    pendingInterviews: "Entrevistas pendientes",
+    completedReports: "Reportes generados",
+    nextAction: "Proxima accion",
+    moduleStatus: "Estado de modulos",
+    interviewQueue: "Entrevistas",
+    reportsArea: "Reportes",
+    nextSteps: "Proximos pasos",
+    purchased: "Comprado",
+    notPurchased: "No comprado",
+    scheduled: "Programada",
+    inProgress: "En progreso",
+    completed: "Completada",
+    viewReport: "Ver reporte",
+    download: "Descargar",
+    startInterview: "Iniciar entrevista",
+    buyModule: "Comprar modulo",
     authTitle: "Acceso seguro",
     authIntro:
       "Empresarios, administradores y consultores internos ingresan con Supabase Auth y permisos por rol.",
@@ -73,6 +93,26 @@ const content = {
     nav: ["Diagnosis", "Modules", "Reports", "Payments"],
     action: "Start diagnosis",
     loginAction: "Log in",
+    dashboardTitle: "Customer dashboard",
+    dashboardIntro:
+      "Executive tracking for purchased modules, pending interviews, generated reports, and recommended actions.",
+    purchasedModules: "Purchased modules",
+    pendingInterviews: "Pending interviews",
+    completedReports: "Generated reports",
+    nextAction: "Next action",
+    moduleStatus: "Module status",
+    interviewQueue: "Interviews",
+    reportsArea: "Reports",
+    nextSteps: "Next steps",
+    purchased: "Purchased",
+    notPurchased: "Not purchased",
+    scheduled: "Scheduled",
+    inProgress: "In progress",
+    completed: "Completed",
+    viewReport: "View report",
+    download: "Download",
+    startInterview: "Start interview",
+    buyModule: "Buy module",
     authTitle: "Secure access",
     authIntro:
       "Business owners, admins, and internal consultants sign in with Supabase Auth and role-based permissions.",
@@ -138,6 +178,26 @@ const content = {
     nav: ["Diagnostico", "Modulos", "Relatorios", "Pagamentos"],
     action: "Iniciar diagnostico",
     loginAction: "Entrar",
+    dashboardTitle: "Painel do cliente",
+    dashboardIntro:
+      "Acompanhamento executivo de modulos comprados, entrevistas pendentes, relatorios gerados e acoes recomendadas.",
+    purchasedModules: "Modulos comprados",
+    pendingInterviews: "Entrevistas pendentes",
+    completedReports: "Relatorios gerados",
+    nextAction: "Proxima acao",
+    moduleStatus: "Estado dos modulos",
+    interviewQueue: "Entrevistas",
+    reportsArea: "Relatorios",
+    nextSteps: "Proximos passos",
+    purchased: "Comprado",
+    notPurchased: "Nao comprado",
+    scheduled: "Programada",
+    inProgress: "Em progresso",
+    completed: "Concluida",
+    viewReport: "Ver relatorio",
+    download: "Baixar",
+    startInterview: "Iniciar entrevista",
+    buyModule: "Comprar modulo",
     authTitle: "Acesso seguro",
     authIntro:
       "Empresarios, administradores e consultores internos entram com Supabase Auth e permissoes por funcao.",
@@ -351,6 +411,38 @@ const flowSteps = [
   },
 ];
 
+const dashboardModuleState = {
+  sales: { purchased: true, interview: "completed", report: true },
+  operations: { purchased: true, interview: "scheduled", report: false },
+  finance: { purchased: true, interview: "in_progress", report: false },
+  marketing: { purchased: false, interview: "scheduled", report: false },
+  technology_ai: { purchased: false, interview: "scheduled", report: false },
+};
+
+const nextStepItems = [
+  {
+    id: "cash",
+    es: "Completar entrevista de Finanzas para priorizar caja y liquidez.",
+    en: "Complete the Finance interview to prioritize cash flow and liquidity.",
+    pt: "Concluir a entrevista de Financas para priorizar caixa e liquidez.",
+    due: "30",
+  },
+  {
+    id: "ops",
+    es: "Agendar Operaciones y documentar los tres procesos mas repetitivos.",
+    en: "Schedule Operations and document the three most repetitive processes.",
+    pt: "Agendar Operacoes e documentar os tres processos mais repetitivos.",
+    due: "60",
+  },
+  {
+    id: "ai",
+    es: "Comprar Tecnologia e IA para identificar automatizaciones de alto impacto.",
+    en: "Purchase Technology and AI to identify high-impact automations.",
+    pt: "Comprar Tecnologia e IA para identificar automacoes de alto impacto.",
+    due: "90",
+  },
+];
+
 function Icon({ path }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -389,6 +481,15 @@ function App() {
   const selectedPrice = planType === "full" ? "$500.000 COP" : "$100.000 COP";
   const selectedPlanLabel = planType === "full" ? t.fullPackage : t.singleModule;
   const reportState = flowStep >= 5 ? t.unlocked : t.locked;
+  const dashboardRows = modules.map((module) => ({
+    ...module,
+    ...dashboardModuleState[module.id],
+  }));
+  const purchasedCount = dashboardRows.filter((module) => module.purchased).length;
+  const pendingInterviewCount = dashboardRows.filter(
+    (module) => module.purchased && module.interview !== "completed",
+  ).length;
+  const completedReportCount = dashboardRows.filter((module) => module.report).length;
 
   const fetchProfile = async (userId) => {
     if (!supabase || !userId) {
@@ -524,6 +625,16 @@ function App() {
     document.getElementById("auth")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const goToDashboard = () => {
+    document.getElementById("cliente")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const getStatusLabel = (status) => {
+    if (status === "completed") return t.completed;
+    if (status === "in_progress") return t.inProgress;
+    return t.scheduled;
+  };
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -558,6 +669,9 @@ function App() {
           </button>
           <button className="secondary-action" onClick={goToAuth} type="button">
             {session ? profile?.role ?? t.loginAction : t.loginAction}
+          </button>
+          <button className="secondary-action" onClick={goToDashboard} type="button">
+            {t.dashboardTitle}
           </button>
         </div>
       </header>
@@ -829,6 +943,120 @@ function App() {
               <strong>{selectedPrice}</strong>
             </div>
           </aside>
+        </div>
+      </section>
+
+      <section className="client-dashboard" id="cliente" aria-label={t.dashboardTitle}>
+        <div className="dashboard-heading">
+          <div>
+            <h2>{t.dashboardTitle}</h2>
+            <p>{t.dashboardIntro}</p>
+          </div>
+          <div className="role-chip">
+            <span>{t.accountType}</span>
+            <strong>{profile?.role === "consultant" ? t.consultant : t.entrepreneur}</strong>
+          </div>
+        </div>
+
+        <div className="kpi-grid">
+          <article>
+            <span>{t.purchasedModules}</span>
+            <strong>{purchasedCount}/5</strong>
+          </article>
+          <article>
+            <span>{t.pendingInterviews}</span>
+            <strong>{pendingInterviewCount}</strong>
+          </article>
+          <article>
+            <span>{t.completedReports}</span>
+            <strong>{completedReportCount}</strong>
+          </article>
+          <article>
+            <span>{t.nextAction}</span>
+            <strong>{t.startInterview}</strong>
+          </article>
+        </div>
+
+        <div className="dashboard-grid">
+          <section className="dashboard-panel module-panel">
+            <div className="panel-title-row">
+              <h3>{t.moduleStatus}</h3>
+              <button className="secondary-action" type="button">
+                {t.buyModule}
+              </button>
+            </div>
+            <div className="module-status-list">
+              {dashboardRows.map((module) => (
+                <article key={module.id}>
+                  <span className="module-icon">
+                    <Icon path={module.icon} />
+                  </span>
+                  <div>
+                    <strong>{module[language]}</strong>
+                    <p>{module.purchased ? t.purchased : t.notPurchased}</p>
+                  </div>
+                  <span className={module.purchased ? "state-pill green" : "state-pill"}>
+                    {module.purchased ? "$100.000 COP" : t.buyModule}
+                  </span>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="dashboard-panel interview-panel">
+            <h3>{t.interviewQueue}</h3>
+            <div className="interview-list">
+              {dashboardRows
+                .filter((module) => module.purchased)
+                .map((module) => (
+                  <article key={module.id}>
+                    <div>
+                      <strong>{module[language]}</strong>
+                      <p>{getStatusLabel(module.interview)}</p>
+                    </div>
+                    <span className={`state-pill ${module.interview}`}>
+                      {module.interview === "completed" ? t.completed : "68%"}
+                    </span>
+                  </article>
+                ))}
+            </div>
+          </section>
+
+          <section className="dashboard-panel reports-panel">
+            <h3>{t.reportsArea}</h3>
+            <div className="report-list">
+              {dashboardRows
+                .filter((module) => module.report)
+                .map((module) => (
+                  <article key={module.id}>
+                    <div>
+                      <strong>{module[language]}</strong>
+                      <p>{t.reportBody}</p>
+                    </div>
+                    <div className="report-actions">
+                      <button className="secondary-action" type="button">
+                        {t.viewReport}
+                      </button>
+                      <button className="primary-action" type="button">
+                        {t.download}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+            </div>
+          </section>
+
+          <section className="dashboard-panel next-panel">
+            <h3>{t.nextSteps}</h3>
+            <div className="next-step-list">
+              {nextStepItems.map((item) => (
+                <article key={item.id}>
+                  <span>{item.due}</span>
+                  <p>{item[language]}</p>
+                </article>
+              ))}
+            </div>
+          </section>
         </div>
       </section>
 
