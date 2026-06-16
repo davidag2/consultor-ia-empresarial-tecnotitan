@@ -577,6 +577,11 @@ button {
   gap: 12px;
 }
 
+.profile-step {
+  display: grid;
+  gap: 14px;
+}
+
 .form-grid label {
   display: grid;
   gap: 8px;
@@ -636,6 +641,14 @@ button {
   color: var(--amber);
   font-size: 13px;
   font-weight: 850;
+}
+
+.flow-message {
+  margin: 0;
+  color: var(--blue-dark);
+  font-size: 13px;
+  font-weight: 780;
+  line-height: 1.45;
 }
 
 .voice-box {

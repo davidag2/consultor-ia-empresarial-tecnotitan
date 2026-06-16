@@ -37,6 +37,9 @@ const content = {
     summary: "Resumen de compra",
     selectedLanguage: "Idioma",
     company: "Empresa",
+    saveCompany: "Guardar empresa",
+    companySaved: "Empresa vinculada a tu usuario",
+    companyRequiresAuth: "Inicia sesion para guardar la empresa",
     selectedPlan: "Plan",
     country: "Pais",
     industry: "Industria",
@@ -99,6 +102,9 @@ const content = {
     summary: "Purchase summary",
     selectedLanguage: "Language",
     company: "Company",
+    saveCompany: "Save company",
+    companySaved: "Company linked to your user",
+    companyRequiresAuth: "Sign in to save the company",
     selectedPlan: "Plan",
     country: "Country",
     industry: "Industry",
@@ -161,6 +167,9 @@ const content = {
     summary: "Resumo da compra",
     selectedLanguage: "Idioma",
     company: "Empresa",
+    saveCompany: "Salvar empresa",
+    companySaved: "Empresa vinculada ao seu usuario",
+    companyRequiresAuth: "Entre para salvar a empresa",
     selectedPlan: "Plano",
     country: "Pais",
     industry: "Industria",
@@ -370,6 +379,8 @@ function App() {
     country: "Colombia",
     industry: "Servicios B2B",
   });
+  const [companyId, setCompanyId] = useState(null);
+  const [companyStatus, setCompanyStatus] = useState("");
   const t = content[language];
   const activeModule = useMemo(
     () => modules.find((module) => module.id === selectedModule),
@@ -461,6 +472,48 @@ function App() {
     await supabase.auth.signOut();
     setSession(null);
     setProfile(null);
+    setCompanyId(null);
+    setCompanyStatus("");
+  };
+
+  const saveCompanyProfile = async () => {
+    if (!supabase || !session?.user?.id) {
+      setCompanyStatus(t.companyRequiresAuth);
+      return false;
+    }
+
+    const companyPayload = {
+      name: companyProfile.name,
+      country: companyProfile.country,
+      preferred_language: language,
+      contact_name: profile?.full_name || authForm.fullName || "",
+      contact_email: session.user.email,
+      owner_user_id: session.user.id,
+    };
+
+    const request = companyId
+      ? supabase.from("companies").update(companyPayload).eq("id", companyId).select("id").single()
+      : supabase.from("companies").insert(companyPayload).select("id").single();
+
+    const { data, error } = await request;
+
+    if (error) {
+      setCompanyStatus(error.message);
+      return false;
+    }
+
+    setCompanyId(data.id);
+    setCompanyStatus(t.companySaved);
+    return true;
+  };
+
+  const advanceFlow = async () => {
+    if (flowSteps[flowStep].id === "profile") {
+      const saved = await saveCompanyProfile();
+      if (!saved) return;
+    }
+
+    setFlowStep(Math.min(flowSteps.length - 1, flowStep + 1));
   };
 
   const goToFlow = () => {
@@ -649,25 +702,31 @@ function App() {
             )}
 
             {flowSteps[flowStep].id === "profile" && (
-              <div className="form-grid">
-                {[
-                  ["name", t.company],
-                  ["country", t.country],
-                  ["industry", t.industry],
-                ].map(([field, label]) => (
-                  <label key={field}>
-                    <span>{label}</span>
-                    <input
-                      onChange={(event) =>
-                        setCompanyProfile({
-                          ...companyProfile,
-                          [field]: event.target.value,
-                        })
-                      }
-                      value={companyProfile[field]}
-                    />
-                  </label>
-                ))}
+              <div className="profile-step">
+                <div className="form-grid">
+                  {[
+                    ["name", t.company],
+                    ["country", t.country],
+                    ["industry", t.industry],
+                  ].map(([field, label]) => (
+                    <label key={field}>
+                      <span>{label}</span>
+                      <input
+                        onChange={(event) =>
+                          setCompanyProfile({
+                            ...companyProfile,
+                            [field]: event.target.value,
+                          })
+                        }
+                        value={companyProfile[field]}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <button className="secondary-action" onClick={saveCompanyProfile} type="button">
+                  {t.saveCompany}
+                </button>
+                {companyStatus && <p className="flow-message">{companyStatus}</p>}
               </div>
             )}
 
@@ -729,7 +788,7 @@ function App() {
               </button>
               <button
                 className="primary-action"
-                onClick={() => setFlowStep(Math.min(flowSteps.length - 1, flowStep + 1))}
+                onClick={advanceFlow}
                 type="button"
               >
                 {flowStep === flowSteps.length - 1 ? t.ready : t.continue}
