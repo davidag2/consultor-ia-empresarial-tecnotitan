@@ -1,11 +1,32 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { hasSupabaseConfig, supabase } from "./supabaseClient";
 import "./styles.css";
 
 const content = {
   es: {
     nav: ["Diagnostico", "Modulos", "Reportes", "Pagos"],
     action: "Iniciar diagnostico",
+    loginAction: "Acceder",
+    authTitle: "Acceso seguro",
+    authIntro:
+      "Empresarios, administradores y consultores internos ingresan con Supabase Auth y permisos por rol.",
+    signIn: "Iniciar sesion",
+    signUp: "Crear cuenta",
+    signOut: "Cerrar sesion",
+    email: "Correo",
+    password: "Contrasena",
+    fullName: "Nombre completo",
+    accountType: "Tipo de cuenta",
+    entrepreneur: "Empresario",
+    consultant: "Consultor interno",
+    admin: "Administrador",
+    roleNote:
+      "Por seguridad, las nuevas cuentas se crean como empresario. Un administrador puede promover consultores o administradores desde la base.",
+    signedInAs: "Sesion activa",
+    noConfig:
+      "Faltan variables de entorno de Supabase. Configura VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY.",
+    authReady: "Auth conectado a Supabase",
     flowTitle: "Flujo completo del cliente",
     flowIntro:
       "Desde la seleccion de idioma hasta la entrega del reporte, cada paso queda preparado para conectar autenticacion, pagos y voz IA.",
@@ -48,6 +69,26 @@ const content = {
   en: {
     nav: ["Diagnosis", "Modules", "Reports", "Payments"],
     action: "Start diagnosis",
+    loginAction: "Log in",
+    authTitle: "Secure access",
+    authIntro:
+      "Business owners, admins, and internal consultants sign in with Supabase Auth and role-based permissions.",
+    signIn: "Sign in",
+    signUp: "Create account",
+    signOut: "Sign out",
+    email: "Email",
+    password: "Password",
+    fullName: "Full name",
+    accountType: "Account type",
+    entrepreneur: "Business owner",
+    consultant: "Internal consultant",
+    admin: "Administrator",
+    roleNote:
+      "For security, new accounts are created as business owners. An admin can promote consultants or admins from the database.",
+    signedInAs: "Active session",
+    noConfig:
+      "Supabase environment variables are missing. Configure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.",
+    authReady: "Auth connected to Supabase",
     flowTitle: "Complete customer flow",
     flowIntro:
       "From language selection to report delivery, every step is ready to connect authentication, payments, and AI voice.",
@@ -90,6 +131,26 @@ const content = {
   pt: {
     nav: ["Diagnostico", "Modulos", "Relatorios", "Pagamentos"],
     action: "Iniciar diagnostico",
+    loginAction: "Entrar",
+    authTitle: "Acesso seguro",
+    authIntro:
+      "Empresarios, administradores e consultores internos entram com Supabase Auth e permissoes por funcao.",
+    signIn: "Entrar",
+    signUp: "Criar conta",
+    signOut: "Sair",
+    email: "Email",
+    password: "Senha",
+    fullName: "Nome completo",
+    accountType: "Tipo de conta",
+    entrepreneur: "Empresario",
+    consultant: "Consultor interno",
+    admin: "Administrador",
+    roleNote:
+      "Por seguranca, novas contas sao criadas como empresario. Um administrador pode promover consultores ou administradores na base.",
+    signedInAs: "Sessao ativa",
+    noConfig:
+      "Faltam variaveis de ambiente do Supabase. Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.",
+    authReady: "Auth conectado ao Supabase",
     flowTitle: "Fluxo completo do cliente",
     flowIntro:
       "Da selecao de idioma ate a entrega do relatorio, cada etapa fica pronta para conectar autenticacao, pagamentos e voz IA.",
@@ -294,6 +355,16 @@ function App() {
   const [selectedModule, setSelectedModule] = useState("sales");
   const [flowStep, setFlowStep] = useState(0);
   const [planType, setPlanType] = useState("single");
+  const [authMode, setAuthMode] = useState("signin");
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [authStatus, setAuthStatus] = useState("");
+  const [authForm, setAuthForm] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+    requestedRole: "entrepreneur",
+  });
   const [companyProfile, setCompanyProfile] = useState({
     name: "Empresa Demo SAS",
     country: "Colombia",
@@ -308,8 +379,96 @@ function App() {
   const selectedPlanLabel = planType === "full" ? t.fullPackage : t.singleModule;
   const reportState = flowStep >= 5 ? t.unlocked : t.locked;
 
+  const fetchProfile = async (userId) => {
+    if (!supabase || !userId) {
+      setProfile(null);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .select("id, full_name, role, preferred_language")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) {
+      setAuthStatus(error.message);
+      return;
+    }
+
+    setProfile(data);
+    if (data?.preferred_language) {
+      setLanguage(data.preferred_language);
+    }
+  };
+
+  useEffect(() => {
+    if (!supabase) return undefined;
+
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      fetchProfile(data.session?.user?.id);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      fetchProfile(nextSession?.user?.id);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  const updateAuthForm = (field, value) => {
+    setAuthForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleAuthSubmit = async (event) => {
+    event.preventDefault();
+    setAuthStatus("");
+
+    if (!supabase) {
+      setAuthStatus(t.noConfig);
+      return;
+    }
+
+    if (authMode === "signin") {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: authForm.email,
+        password: authForm.password,
+      });
+
+      setAuthStatus(error ? error.message : t.signedInAs);
+      return;
+    }
+
+    const { error } = await supabase.auth.signUp({
+      email: authForm.email,
+      password: authForm.password,
+      options: {
+        data: {
+          full_name: authForm.fullName,
+          preferred_language: language,
+          requested_role: authForm.requestedRole,
+        },
+      },
+    });
+
+    setAuthStatus(error ? error.message : t.authReady);
+  };
+
+  const handleSignOut = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setSession(null);
+    setProfile(null);
+  };
+
   const goToFlow = () => {
     document.getElementById("flujo")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const goToAuth = () => {
+    document.getElementById("auth")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -343,6 +502,9 @@ function App() {
           </div>
           <button className="primary-action" onClick={goToFlow} type="button">
             {t.action}
+          </button>
+          <button className="secondary-action" onClick={goToAuth} type="button">
+            {session ? profile?.role ?? t.loginAction : t.loginAction}
           </button>
         </div>
       </header>
@@ -608,6 +770,121 @@ function App() {
               <strong>{selectedPrice}</strong>
             </div>
           </aside>
+        </div>
+      </section>
+
+      <section className="auth-section" id="auth" aria-label={t.authTitle}>
+        <div className="auth-copy">
+          <h2>{t.authTitle}</h2>
+          <p>{t.authIntro}</p>
+          <div className="auth-status-line">
+            <span className={hasSupabaseConfig ? "status-dot green" : "status-dot amber"} />
+            <strong>{hasSupabaseConfig ? t.authReady : t.noConfig}</strong>
+          </div>
+        </div>
+
+        <div className="auth-card">
+          {session ? (
+            <div className="session-panel">
+              <span>{t.signedInAs}</span>
+              <h3>{profile?.full_name || session.user.email}</h3>
+              <dl>
+                <div>
+                  <dt>{t.email}</dt>
+                  <dd>{session.user.email}</dd>
+                </div>
+                <div>
+                  <dt>{t.accountType}</dt>
+                  <dd>
+                    {profile?.role === "admin"
+                      ? t.admin
+                      : profile?.role === "consultant"
+                        ? t.consultant
+                        : t.entrepreneur}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t.selectedLanguage}</dt>
+                  <dd>{profile?.preferred_language?.toUpperCase() || language.toUpperCase()}</dd>
+                </div>
+              </dl>
+              <button className="secondary-action" onClick={handleSignOut} type="button">
+                {t.signOut}
+              </button>
+            </div>
+          ) : (
+            <form className="auth-form" onSubmit={handleAuthSubmit}>
+              <div className="auth-tabs" role="tablist" aria-label={t.authTitle}>
+                <button
+                  className={authMode === "signin" ? "active" : ""}
+                  onClick={() => setAuthMode("signin")}
+                  type="button"
+                >
+                  {t.signIn}
+                </button>
+                <button
+                  className={authMode === "signup" ? "active" : ""}
+                  onClick={() => setAuthMode("signup")}
+                  type="button"
+                >
+                  {t.signUp}
+                </button>
+              </div>
+
+              {authMode === "signup" && (
+                <label>
+                  <span>{t.fullName}</span>
+                  <input
+                    autoComplete="name"
+                    onChange={(event) => updateAuthForm("fullName", event.target.value)}
+                    value={authForm.fullName}
+                  />
+                </label>
+              )}
+
+              <label>
+                <span>{t.email}</span>
+                <input
+                  autoComplete="email"
+                  onChange={(event) => updateAuthForm("email", event.target.value)}
+                  type="email"
+                  value={authForm.email}
+                />
+              </label>
+
+              <label>
+                <span>{t.password}</span>
+                <input
+                  autoComplete={authMode === "signin" ? "current-password" : "new-password"}
+                  minLength="6"
+                  onChange={(event) => updateAuthForm("password", event.target.value)}
+                  type="password"
+                  value={authForm.password}
+                />
+              </label>
+
+              {authMode === "signup" && (
+                <label>
+                  <span>{t.accountType}</span>
+                  <select
+                    onChange={(event) => updateAuthForm("requestedRole", event.target.value)}
+                    value={authForm.requestedRole}
+                  >
+                    <option value="entrepreneur">{t.entrepreneur}</option>
+                    <option value="consultant">{t.consultant}</option>
+                  </select>
+                </label>
+              )}
+
+              <p className="role-note">{t.roleNote}</p>
+
+              {authStatus && <p className="auth-message">{authStatus}</p>}
+
+              <button className="primary-action" type="submit">
+                {authMode === "signin" ? t.signIn : t.signUp}
+              </button>
+            </form>
+          )}
         </div>
       </section>
     </main>
